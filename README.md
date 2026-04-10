@@ -17,14 +17,14 @@
 Python
 
 ### 時程規劃
-week 7 : 關鍵字搜尋
-week 8 : Boolean Search
-week 9 : Boolean Search
-week 10 : Prefix tree
-week 11 : Prefix tree
-week 12 : 關鍵字相關性
-week 13 : 排序
-week 14 : 統整合併
+week 7 : 關鍵字搜尋  
+week 8 : Boolean Search  
+week 9 : Boolean Search  
+week 10 : Prefix tree  
+week 11 : Prefix tree  
+week 12 : 關鍵字相關性  
+week 13 : 排序  
+week 14 : 統整合併  
 
 ### 與課程的關聯
 1. 資料結構 
