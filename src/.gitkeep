@@ -1,0 +1,312 @@
+#正規表達式: .findall()-->斷詞, .split()-->切句
+import re
+
+#時間模組: .perf_counter()-->用於測量某段程式碼運行時間
+import time
+
+#隨機模組: choices()->可重複隨機抽樣, sample()->不重複隨機抽樣
+import random
+
+#主程式碼
+#Class: TextSearchSystem
+class TextSearchSystem:
+    def __init__(self):
+        self.raw_text = ""
+        self.sentences = []          # 原始句子
+        self.sentence_tokens = []    # 每句的 tokens
+        self.vocab_list = []         # List
+        self.vocab_dict = {}         # Hash Map
+    # ---------- 處理資料 ----------
+    #斷詞
+    def tokenize(self, text):
+        text = text.lower()
+        return re.findall(r'\w+', text)
+
+    #切句-list
+    def split_sentences(self, text):
+        text = text.strip()
+        if not text:
+            return []
+    
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+
+        result = []
+        for s in sentences:
+            if s.strip():
+                result.append(s.strip())
+    
+        return result
+
+    # ---------- Load .txt ----------
+    #讀入txt檔
+    def load_txt(self, file_path):
+        with open(file_path, "r", encoding="utf-8") as f:
+            self.raw_text = f.read().strip()
+
+        #切句-->split_sentences
+        self.sentences = self.split_sentences(self.raw_text)
+
+        #建立每句的token-->tokenize
+        temp = []
+        for s in self.sentences:
+        	temp.append(self.tokenize(s))
+        self.sentence_tokens = temp
+
+        #做全文的斷詞
+        all_tokens = self.tokenize(self.raw_text)
+
+        #以字母排序並做成單字表
+        #list轉set，做「單字表」，只保留「這篇文章出現過哪些單字」
+        temp_set = set(all_tokens)
+        #set轉回list，做排序
+        unique_words = sorted(temp_set)
+
+        # List
+        self.vocab_list = unique_words
+
+        # Dict
+        self.vocab_dict = {}
+        for w in unique_words:
+        	self.vocab_dict[w] = True
+        
+        #__setitem__ : 用於「賦值」
+        #self.vocab_dict[w] = True == self.vocab_dict.__setitem__(w, True)
+
+    # ---------- Search Methods (找目標單字, 回傳Bool)----------
+    #List
+    def list_search(self, query):
+        query = query.lower()
+        for w in self.vocab_list:
+            if w == query:
+                return True
+        return False
+
+    #dict
+    def dict_search(self, query):
+        query = query.lower()
+        return query in self.vocab_dict
+
+    # ---------- 回傳query在哪些句子出現 ----------
+    def sentence_matches(self, query):
+        query = query.lower()
+        results = []
+
+        for i, tokens in enumerate(self.sentence_tokens):
+            count = tokens.count(query)
+            if count > 0:
+                results.append({
+                    "sentence_id": i + 1,
+                    "sentence": self.sentences[i],
+                    "count": count,
+                })
+        return results
+
+        # ---------- 選擇搜尋方法 ----------
+    def search(self, query, method="dict"):
+        query = query.lower()
+
+        if method == "list":
+            found = self.list_search(query)
+        elif method == "dict":
+            found = self.dict_search(query)
+        else:
+            raise ValueError("method must be 'list' or 'dict'")
+
+        matches = self.sentence_matches(query)
+        
+        #total_count = sum(m["count"] for m in matches)
+        total_count = 0
+        for m in matches:
+            total_count += m["count"]
+        
+        return {
+            "query": query,
+            "method": method,
+            "found": found,
+            "total_count": total_count,
+            "matches": matches
+        }
+
+    # ---------- Boolean Search ----------
+    def boolean_search(self, query):
+        tokens = query.lower().split()
+        matched_sentences = []
+
+        for i, sentence_tokens in enumerate(self.sentence_tokens):
+            words = set(sentence_tokens) #空間換時間(用set，不用list)
+
+            idx = 0
+            current = None
+
+            while idx < len(tokens):
+                token = tokens[idx]
+
+                if token == "and":
+                    idx += 1
+                    term = tokens[idx]
+                    current = current and (term in words)
+
+                elif token == "or":
+                    idx += 1
+                    term = tokens[idx]
+                    current = current or (term in words)
+                else:
+                    current = (token in words)
+
+                idx += 1
+
+            if current:
+                matched_sentences.append({
+                    "sentence_id": i + 1,
+                    "sentence": self.sentences[i]
+                })
+
+        return matched_sentences
+
+    # ---------- Print ----------
+    def show_search_result(self, result):
+        print(f"Query       : {result['query']}")
+        print(f"Method      : {result['method']}")
+        print(f"Found       : {result['found']}")
+        print(f"Total Count : {result['total_count']}")
+        print("-" * 60)
+
+        if not result["matches"]:
+            print("No matched sentences.")
+            return
+
+        for m in result["matches"]:
+            print(f"[Sentence {m['sentence_id']}], count={m['count']}")
+            print(m["sentence"])
+            print("-" * 60)
+
+    def show_boolean_result(self, results, query):
+        print(f"Boolean Query: {query}")
+        print("-" * 60)
+        if not results:
+            print("No matched sentences.")
+            return
+        for r in results:
+            print(f"[Sentence {r['sentence_id']}]")
+            print(r["sentence"])
+            print("-" * 60)
+
+# 輸出: 短篇(約1000字)v.s. 長篇(約7700字)
+#short
+short_system = TextSearchSystem()
+short_system.load_txt("short1.txt")
+
+print("===== List Search =====")
+short_result_list = short_system.search("dog", method="list")
+short_system.show_search_result(short_result_list)
+
+print()
+print("===== Dict Search =====")
+short_result_dict = short_system.search("dog", method="dict")
+short_system.show_search_result(short_result_dict)
+
+print()
+print("===== Boolean Search - AND =====")
+short_bool_result_and = short_system.boolean_search("singing AND dog")
+short_system.show_boolean_result(short_bool_result_and, "singing AND dog")
+
+print()
+print("===== Boolean Search - OR =====")
+short_bool_result_or = short_system.boolean_search("singing or dog")
+short_system.show_boolean_result(short_bool_result_or, "singing or dog")
+
+#long
+short_system = TextSearchSystem()
+short_system.load_txt("long.txt")
+
+print("===== List Search =====")
+short_result_list = short_system.search("psychology", method="list")
+short_system.show_search_result(short_result_list)
+
+print()
+print("===== Dict Search =====")
+short_result_dict = short_system.search("psychology", method="dict")
+short_system.show_search_result(short_result_dict)
+
+print()
+print("===== Boolean Search - AND =====")
+short_bool_result_and = short_system.boolean_search("psychology AND social")
+short_system.show_boolean_result(short_bool_result_and, "psychology AND social")
+
+print()
+print("===== Boolean Search - OR =====")
+short_bool_result_or = short_system.boolean_search("psychology OR social")
+short_system.show_boolean_result(short_bool_result_or, "psychology OR social")
+
+# 效能比較
+#圖表模組
+import matplotlib.pyplot as plt
+
+def plot_barChart(results):
+    names = list(results.keys())
+    times = list(results.values())
+
+    plt.figure(figsize=(6,4))
+    plt.bar(names, times)
+    plt.title("Comparison")
+    plt.ylabel("Time (seconds)")
+    plt.xlabel("Data Structure")
+    plt.show()
+
+#存在 v.s. 不存在
+def generate_queries(vocab, num_queries=100):
+    if len(vocab) < num_queries // 2:
+        exist_words = random.choices(vocab, k=num_queries // 2)
+    else:
+        exist_words = random.sample(vocab, num_queries // 2)
+
+    fake_words = [w + "_zzz" for w in exist_words]
+    return exist_words + fake_words
+
+#時間
+def benchmark_search(system, queries):
+    results = {}
+
+    # List
+    start = time.perf_counter()
+    for q in queries:
+        system.list_search(q)
+    results["List"] = time.perf_counter() - start
+
+    # Dict
+    start = time.perf_counter()
+    for q in queries:
+        system.dict_search(q)
+    results["Hash Map"] = time.perf_counter() - start
+
+    return results
+
+#長條圖
+# ---------- short ----------
+short_system = TextSearchSystem()
+short_system.load_txt("short1.txt")
+
+short_vocab = short_system.vocab_list
+short_queries = generate_queries(short_vocab, num_queries=100)
+short_bench = benchmark_search(short_system, short_queries)
+
+print("short：")
+print("Raw text length:", len(short_system.raw_text))
+print("Sentence count:", len(short_system.sentences))
+print("Vocab size:", len(short_system.vocab_list))
+plot_barChart(short_bench)
+
+
+# ---------- long ----------
+long_system = TextSearchSystem()
+long_system.load_txt("long.txt")
+
+long_vocab = long_system.vocab_list
+long_queries = generate_queries(long_vocab, num_queries=100)
+long_bench = benchmark_search(long_system, long_queries)
+
+print("long：")
+print("Raw text length:", len(long_system.raw_text))
+print("Sentence count:", len(long_system.sentences))
+print("Vocab size:", len(long_system.vocab_list))
+plot_barChart(long_bench)
