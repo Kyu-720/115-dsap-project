@@ -1,0 +1,320 @@
+import re
+from collections import Counter
+
+
+# ==================================================
+# Output
+# ==================================================
+class PrettyDict(dict):
+    def __repr__(self):
+        return self.__str__()
+
+class ArticleInfo(PrettyDict):
+    def __str__(self):
+        return (
+            "===== Article Information =====\n"
+            f"Sentence count : {self.get('sentence_count')}\n"
+            f"Total words    : {self.get('total_words')}\n"
+            + "=" * 40
+        )
+
+
+class SearchResult(PrettyDict):
+    def __str__(self):
+        lines = []
+
+        lines.append("===== Search Result =====")
+        lines.append(f"Query        : {self.get('query')}")
+        lines.append(f"Found        : {self.get('found')}")
+        lines.append(f"Total Count  : {self.get('total_count')}")
+        lines.append("=" * 50)
+
+        matches = self.get("matches", [])
+
+        if not matches:
+            lines.append("No matched sentences.")
+            lines.append("=" * 50)
+            return "\n".join(lines)
+
+        lines.append("Matched Sentences:")
+        lines.append("-" * 50)
+
+        for m in matches:
+            lines.append(f"[Sentence {m['sentence_id']}]")
+            lines.append(f"Count : {m['count']}")
+            lines.append(f"Text  : {m['sentence']}")
+            lines.append("-" * 50)
+
+        return "\n".join(lines)
+
+
+class BooleanResult(list):
+    def __init__(self, items, query=""):
+        super().__init__(items)
+        self.query = query
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        lines = []
+        lines.append("===== Boolean Search Result =====")
+        lines.append(f"Boolean Query : {self.query}")
+        lines.append(f"Matched Count : {len(self)}")
+        lines.append("=" * 50)
+
+        if not self:
+            lines.append("No matched sentences.")
+            lines.append("=" * 50)
+            return "\n".join(lines)
+
+        for r in self:
+            lines.append(f"[Sentence {r['sentence_id']}]")
+            lines.append(r["sentence"])
+            lines.append("-" * 50)
+
+        return "\n".join(lines)
+
+
+class PrefixResult(list):
+    def __init__(self, items, prefix=""):
+        super().__init__(items)
+        self.prefix = prefix
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        lines = []
+        lines.append("===== Prefix Search Result =====")
+        lines.append(f"Prefix        : {self.prefix}")
+        lines.append(f"Matched Count : {len(self)}")
+        lines.append("=" * 50)
+
+        if not self:
+            lines.append("No words found with this prefix.")
+            return "\n".join(lines)
+
+        for i, word in enumerate(self, start=1):
+            lines.append(f"{i}. {word}")
+
+        return "\n".join(lines)
+
+
+# ==================================================
+# Trie Tree
+# ==================================================
+
+class TrieNode:
+    def __init__(self):
+        self.children = {}
+        self.is_end = False
+
+
+class Trie:
+    def __init__(self):
+        self.root = TrieNode()
+
+    def insert_word(self, word):
+        node = self.root
+        for ch in word:
+            if ch not in node.children:
+                node.children[ch] = TrieNode()
+            node = node.children[ch]
+        node.is_end = True
+
+    def contains_word(self, word):
+        node = self.root
+        for ch in word:
+            if ch not in node.children:
+                return False
+            node = node.children[ch]
+        return node.is_end
+
+    def find_words_with_prefix(self, prefix):
+        node = self.root
+        for ch in prefix:
+            if ch not in node.children:
+                return []
+            node = node.children[ch]
+        return self._collect(node, prefix)
+
+    def _collect(self, node, prefix):
+        results = []
+        if node.is_end:
+            results.append(prefix)
+
+        for ch, nxt in node.children.items():
+            results.extend(self._collect(nxt, prefix + ch))
+
+        return results
+
+
+# ==================================================
+# Text Search System
+# ==================================================
+
+class TextSearchSystem:
+    def __init__(self):
+        self._raw_text = ""
+        self._sentences = []
+        self._sentence_tokens = []
+        self._vocab_list = []
+        self._vocab_dict = {}
+        self._word_counter = Counter()
+        self._trie = Trie()
+
+    def _tokenize_text(self, text):
+        return re.findall(r'\w+', text.lower())
+
+    def _split_text_into_sentences(self, text):
+        return re.split(r'(?<=[.!?])\s+', text.strip())
+
+    def _highlight_text(self, sentence, query_terms, is_phrase=True):
+        if is_phrase and len(query_terms) > 1:
+            phrase = " ".join(query_terms)
+            return re.sub(rf'\b{re.escape(phrase)}\b',
+                          f"[{phrase}]", sentence, flags=re.IGNORECASE)
+        else:
+            for term in query_terms:
+                sentence = re.sub(rf'\b{re.escape(term)}\b',
+                                  f"[{term}]", sentence, flags=re.IGNORECASE)
+            return sentence
+
+    def _search_word_with_list(self, word):
+        return word.lower() in self._vocab_list
+
+    def _search_word_with_hash_map(self, word):
+        return word.lower() in self._vocab_dict
+
+    def _search_word_with_trie(self, word):
+        return self._trie.contains_word(word.lower())
+
+    #===load .txt===
+    def load_text_file(self, file_path):
+        text = open(file_path, encoding="utf-8").read()
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        self._raw_text = text
+        self._sentences = self._split_text_into_sentences(text)
+
+        self._sentence_tokens = [self._tokenize_text(s) for s in self._sentences]
+        tokens = self._tokenize_text(text)
+
+        self._word_counter = Counter(tokens)
+        self._vocab_list = sorted(set(tokens))
+        self._vocab_dict = {w: True for w in self._vocab_list}
+
+        for w in self._vocab_list:
+            self._trie.insert_word(w)
+
+    def _find_matching_sentences(self, query):
+        query_terms = self._tokenize_text(query)
+        results = []
+
+        for i, sentence_tokens in enumerate(self._sentence_tokens):
+            if len(query_terms) == 1:
+                count = sentence_tokens.count(query_terms[0])
+            else:
+                count = sum(
+                    sentence_tokens[j:j+len(query_terms)] == query_terms
+                    for j in range(len(sentence_tokens)-len(query_terms)+1)
+                )
+
+            if count > 0:
+                results.append({
+                    "sentence_id": i + 1,
+                    "sentence": self._highlight_text(self._sentences[i], query_terms),
+                    "count": count
+                })
+
+        results.sort(key=lambda x: (-x["count"], x["sentence_id"]))
+        return results
+
+    def search(self, query):
+        query_terms = self._tokenize_text(query)
+
+        if not query_terms:
+            return SearchResult({
+                "query": query,
+                "found": False,
+                "total_count": 0,
+                "matches": []
+            })
+
+        if len(query_terms) == 1:
+            found = query_terms[0] in self._vocab_dict
+        else:
+            found = False
+
+        matches = self._find_matching_sentences(query)
+
+        if len(query_terms) > 1:
+            found = len(matches) > 0
+
+        total_count = sum(m["count"] for m in matches)
+
+        return SearchResult({
+            "query": query,
+            "found": found,
+            "total_count": total_count,
+            "matches": matches
+        })
+
+    def search_with_boolean(self, query):
+        tokens = re.findall(r'\(|\)|\w+', query.lower())
+
+        query_words = [token for token in tokens if token not in ("and", "or", "(", ")")]
+
+        results = []
+
+        for i, token_list in enumerate(self._sentence_tokens):
+            words = set(token_list)
+            idx = 0
+
+            def parse_or():
+                nonlocal idx
+                val = parse_and()
+                while idx < len(tokens) and tokens[idx] == "or":
+                    idx += 1
+                    val = val or parse_and()
+                return val
+
+            def parse_and():
+                nonlocal idx
+                val = parse_term()
+                while idx < len(tokens) and tokens[idx] == "and":
+                    idx += 1
+                    val = val and parse_term()
+                return val
+
+            def parse_term():
+                nonlocal idx
+                if tokens[idx] == "(":
+                    idx += 1
+                    val = parse_or()
+                    idx += 1
+                    return val
+                term = tokens[idx]
+                idx += 1
+                return term in words
+
+            if parse_or():
+                results.append({
+                    "sentence_id": i + 1,
+                    "sentence": self._highlight_text(self._sentences[i], query_words, is_phrase=False)
+                })
+
+        return BooleanResult(results, query)
+
+    def search_prefix(self, prefix):
+        results = self._trie.find_words_with_prefix(prefix.lower())
+        results.sort(key=lambda w: -self._word_counter[w])
+        return PrefixResult(results, prefix)
+
+    def get_article_info(self):
+        total_words = sum(self._word_counter.values())
+        return ArticleInfo({
+            "sentence_count": len(self._sentences),
+            "total_words": total_words
+        })
