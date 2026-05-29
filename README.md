@@ -116,10 +116,12 @@ Boolean Search：
 ## Final Report
 ### 專案說明
 <!-- 完整描述你的專案做了什麼 -->
-以 Python library 的形式實作兩個模組：text_search，文字搜尋系統本身，以及compare_tools，效能分析。
-主要的功能在於布林搜尋，透過條件組合，尋找「符合特定語意條件的內容」。
-定位：文件內的閱讀輔助搜尋工具。
-text_search
+以 Python library 的形式實作兩個模組：text_search，文字搜尋系統本身，以及compare_tools，效能分析。  
+主要的功能在於布林搜尋，透過條件組合，尋找「符合特定語意條件的內容」。  
+定位：文件內的閱讀輔助搜尋工具。  
+
+以下是兩個模組主要運行功能：  
+text_search(文字搜尋系統本身)  
 - 基本搜尋 : 查詢單字或完整片語(兩個以上連續的單字)
 - Boolean search，處理帶有括號的條件查詢。透過條件組合，查找「符合特定語意條件的內容」。
 - Prefix search，以文字的開頭找出其他可能的單字
@@ -131,7 +133,7 @@ compare_tools
 
 ### 使用方式
 <!-- 如何編譯、執行、使用你的程式 -->
-以Python library的形式提供，使用者import此文字搜尋系統的library，並且可使用以下函式來進行文章內的查找 : 
+以Python library的形式提供，使用者import此文字搜尋系統的library，並且可使用以下函式來進行文章內的查找 :   
 text_search
 - .get_article_info() : 用以看文章的資訊：句子數量與總詞數
 - .search(query) : 進行單字搜尋或完整片語搜尋
@@ -147,24 +149,23 @@ compare_tools
 <!-- 總結你的專題與進階程式設計及資料結構課程之間的關聯 -->
 text_search : 
 - List / Array : 
-- 使用一維與二維List儲存文字處理後的資料。
-- 一維 : _sentences(切句後的句子)、_vocab_list(單字表)。
-- 二維 : _sentence_tokens(斷詞後的結果:sentences*tokens)。
+    - 使用一維與二維List儲存文字處理後的資料。
+        - 一維 : _sentences(切句後的句子)、_vocab_list(單字表)。
+        - 二維 : _sentence_tokens(斷詞後的結果:sentences $\times$ tokens)。
 
 - Hash Map/ Hash Table : 由Python dict透過hash function將key對應到hash table中的位置。
-- 結果輸出 : 用dictionary儲存搜尋結果與比較結果。
-- 關鍵字查詢 : 用_vocab_dict快速判斷單字是否存在。
+    - 結果輸出 : 用dictionary儲存搜尋結果與比較結果。
+    - 關鍵字查詢 : 用_vocab_dict快速判斷單字是否存在。
 
 - Sorting : 
-- 搜尋結果依出現次數，由大到小排序。
-- 前綴搜尋結果依照在文章中的出現次數，由大到小排序。
+    - 搜尋結果依出現次數，由大到小排序。
 
 - Tree : 
-- 前綴搜尋使用Trie實作。Trie是一種多路樹，每個節點可連接多個子節點。
+    - 前綴搜尋使用Trie實作。Trie是一種多路樹，每個節點可連接多個子節點。
 
 - Recursion : 
-- 用遞迴做DFS，找符合prefix的單字。
-- Boolean Search，處理括號中的巢狀布林條件。
+    - 用遞迴做DFS，找符合prefix的單字。
+    - Boolean Search，處理括號中的巢狀布林條件。
 
 compare_tools : 
 - 演算法分析
